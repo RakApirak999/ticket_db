@@ -3,10 +3,17 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 from dotenv import load_dotenv
+from supabase import create_client   # ← ย้าย import มาไว้บน
 
-load_dotenv()  # โหลดค่าจากไฟล์ .envp
+load_dotenv()
 
 app = Flask(__name__)
+
+# สร้าง Supabase client ครั้งเดียวตอน startup
+supabase_client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
 
 def get_db_connection():
     return psycopg2.connect(
@@ -14,18 +21,23 @@ def get_db_connection():
         port=os.getenv("DB_PORT", 5432),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
-        dbname=os.getenv("DB_NAME")   # ← psycopg2 ใช้ "dbname" ไม่ใช่ "database"
+        dbname=os.getenv("DB_NAME")
     )
 
 @app.route("/")
 def index():
     conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)  # ← ต่างจาก MySQL ตรงนี้
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute("SELECT * FROM concerts")
     concerts = cursor.fetchall()
     cursor.close()
     conn.close()
     return render_template("index.html", concerts=concerts)
 
+@app.route("/api/concerts")
+def api_concerts():
+    response = supabase_client.table("concerts").select("*").execute()
+    return response.data
+
 if __name__ == "__main__":
-    app.run(debug=True,port = "2202")
+    app.run(debug=True, port="2202")
